@@ -109,6 +109,7 @@ public class bat : MonoBehaviour
     public AudioClip airAttacksound;
 
 
+
     void Start()
 
     {
@@ -125,71 +126,75 @@ public class bat : MonoBehaviour
 
     }
 
+ 
     void Update()
-
     {
+        // 攻撃中・硬直中・敵がいないときは入力を受け付けない
+        if (enemy == null || isAttackCooldown || isAttacking)
+            return;
 
-        // enemyがいない、またはクールダウン中（硬直中）、またはアニメ再生中は入力を受け付けない
+        KeyCode attackKey;
+        KeyCode gamepadAttackKey;
 
-        if (enemy == null || isAttackCooldown || isAttacking) return;
-
-        KeyCode attackKey = player2 ? KeyCode.DownArrow : KeyCode.S;
-
-        // 1. 攻撃ボタンを押した瞬間（溜め開始）
-
-        if (Input.GetKeyDown(attackKey))
-
+        if (player2)
         {
+            attackKey = KeyCode.DownArrow;
+            gamepadAttackKey = KeyCode.Joystick2Button5;
+        }
+        else
+        {
+            attackKey = KeyCode.S;
+            gamepadAttackKey = KeyCode.JoystickButton5;
+        }
 
+        // キーボードまたはゲームパッドの入力状態
+        bool keyDown =
+            Input.GetKeyDown(attackKey) ||
+            Input.GetKeyDown(gamepadAttackKey);
+
+        bool keyHeld =
+            Input.GetKey(attackKey) ||
+            Input.GetKey(gamepadAttackKey);
+
+        bool keyUp =
+            Input.GetKeyUp(attackKey) ||
+            Input.GetKeyUp(gamepadAttackKey);
+
+        // 1. ボタンを押した瞬間：溜め開始
+        if (keyDown && !isCharging)
+        {
             isCharging = true;
-
             currentChargeTime = 0f;
 
             if (spriteRenderer != null && startChargeSprite != null)
-
             {
-
                 spriteRenderer.sprite = startChargeSprite;
-
             }
-
         }
 
-        // 2. 攻撃ボタンを長押ししている間
-
-        if (isCharging && Input.GetKey(attackKey))
-
+        // 2. ボタンを押している間：溜め時間を増やす
+        if (isCharging && keyHeld)
         {
-
             currentChargeTime += Time.deltaTime;
 
             UpdateChargeVisual();
 
+            // 最大時間を超えたら自動で攻撃
             if (currentChargeTime >= autoReleaseTime)
-
             {
-
                 currentChargeTime = autoReleaseTime;
-
                 ReleaseAttack();
-
                 return;
-
             }
-
         }
 
-        // 3. 攻撃ボタンを離した瞬間（攻撃発動）
-
-        if (isCharging && Input.GetKeyUp(attackKey))
-
+        // 3. ボタンを離した瞬間：攻撃
+        if (isCharging && keyUp)
         {
-
             ReleaseAttack();
-
         }
-
     }
+
 
     void UpdateChargeVisual()
 

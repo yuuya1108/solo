@@ -186,7 +186,11 @@ public class Controller : MonoBehaviour
         //    }
 
         //}
-
+        //とわ追加ノックバック中なら、以下の移動処理をすべてスキップする
+        if (GetComponent<PlayerKnockback>().IsKnockbacked)
+        {
+            return;
+        }
         // =========================
 
         // 通常操作
@@ -680,9 +684,8 @@ public class Controller : MonoBehaviour
     void FixedUpdate()
 
     {
-
         PreventJumpPassing();
-
+        PreventPlayerCrossing();
     }
 
     // =========================
@@ -1015,6 +1018,56 @@ public class Controller : MonoBehaviour
 
         }
 
+    }
+
+    private void PreventPlayerCrossing()
+    {
+        if (enemy == null || rb == null || isDead)
+            return;
+
+        Controller enemyController = enemy.GetComponent<Controller>();
+
+        if (enemyController != null && enemyController.isDead)
+            return;
+
+        float boundary;
+
+        if (!player2)
+        {
+            // P1はP2の左側を維持する
+            boundary = enemy.position.x - stopDistance;
+
+            if (rb.position.x > boundary)
+            {
+                rb.position = new Vector2(boundary, rb.position.y);
+
+                if (rb.linearVelocity.x > 0f)
+                {
+                    rb.linearVelocity = new Vector2(
+                        0f,
+                        rb.linearVelocity.y
+                    );
+                }
+            }
+        }
+        else
+        {
+            // P2はP1の右側を維持する
+            boundary = enemy.position.x + stopDistance;
+
+            if (rb.position.x < boundary)
+            {
+                rb.position = new Vector2(boundary, rb.position.y);
+
+                if (rb.linearVelocity.x < 0f)
+                {
+                    rb.linearVelocity = new Vector2(
+                        0f,
+                        rb.linearVelocity.y
+                    );
+                }
+            }
+        }
     }
 
     //// =========================
