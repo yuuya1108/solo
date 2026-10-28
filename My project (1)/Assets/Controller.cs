@@ -90,6 +90,10 @@ public class Controller : MonoBehaviour
 
     private bool hasLeftGround = false;
 
+    //アイテム
+    //シールド
+    public bool isItemStunned = false;
+    private Coroutine itemStunCoroutine;
 
     void Start()
 
@@ -126,7 +130,12 @@ public class Controller : MonoBehaviour
     void Update()
 
     {
-
+        if (isItemStunned)
+        {
+            // シールドに攻撃を防がれたら、その場で完全に停止
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
         // =========================
 
         // 死亡判定
@@ -1020,7 +1029,26 @@ public class Controller : MonoBehaviour
         }
 
     }
+    //シールド硬直
+    public void ApplyItemStun(float duration)
+    {
+        if (itemStunCoroutine != null)
+        {
+            StopCoroutine(itemStunCoroutine);
+        }
 
+        itemStunCoroutine = StartCoroutine(ItemStunRoutine(duration));
+    }
+
+    private IEnumerator ItemStunRoutine(float duration)
+    {
+        isItemStunned = true;
+
+        yield return new WaitForSeconds(duration);
+
+        isItemStunned = false;
+        itemStunCoroutine = null;
+    }
     private void PreventPlayerCrossing()
     {
         if (enemy == null || rb == null || isDead)
@@ -1069,6 +1097,7 @@ public class Controller : MonoBehaviour
                 }
             }
         }
+
     }
 
     //// =========================

@@ -1,15 +1,16 @@
+
 using System.Collections;
 using UnityEngine;
 
 public class WoodBox : MonoBehaviour
 {
     [Header("設定")]
-    [SerializeField] private int maxHp = 2;          // 最大耐久値
-    [SerializeField] private float respawnTime = 5f; // 復活までの時間（秒）
+    [SerializeField] private int maxHp = 2;
+    [SerializeField] private float respawnTime = 5f;
 
     [Header("画像の設定")]
-    [SerializeField] private Sprite normalSprite;    // 通常時の画像
-    [SerializeField] private Sprite crackedSprite;   // ヒビが入った時の画像
+    [SerializeField] private Sprite normalSprite;
+    [SerializeField] private Sprite crackedSprite;
 
     private int currentHp;
     private SpriteRenderer spriteRenderer;
@@ -20,7 +21,7 @@ public class WoodBox : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         boxCollider = GetComponent<Collider2D>();
 
-        // 最初にもし通常画像が未設定なら、現在の画像を登録しておく
+        // 通常画像が未設定なら、現在の画像を登録
         if (normalSprite == null && spriteRenderer != null)
         {
             normalSprite = spriteRenderer.sprite;
@@ -28,53 +29,63 @@ public class WoodBox : MonoBehaviour
 
         ResetBox();
     }
+
     private IEnumerator DestroyAndRespawnRoutine()
     {
         // 木箱を一時的に非表示にする
         spriteRenderer.enabled = false;
-        boxCollider.enabled = false;
 
-        // 指定した秒数だけ待つ
+        if (boxCollider != null)
+            boxCollider.enabled = false;
+
+        // 復活まで待つ
         yield return new WaitForSeconds(respawnTime);
 
         // 木箱を復活させる
         ResetBox();
     }
-    // 外部（bat.cs）から呼び出されるダメージ関数
+
+    // bat.cs から呼び出されるダメージ処理
     public void TakeDamage(int damage, bat attacker)
-{
-    if (currentHp <= 0 || !spriteRenderer.enabled)
-        return;
-
-    currentHp -= damage;
-
-    if (currentHp == 1 && crackedSprite != null)
     {
-        spriteRenderer.sprite = crackedSprite;
-    }
+        if (currentHp <= 0 || !spriteRenderer.enabled)
+            return;
 
-    if (currentHp <= 0)
-    {
-        if (attacker != null)
+        currentHp -= damage;
+
+        // ヒビの入った画像に変更
+        if (currentHp == 1 && crackedSprite != null)
         {
-            attacker.EquipMetalBat();
+            spriteRenderer.sprite = crackedSprite;
         }
 
-        StartCoroutine(DestroyAndRespawnRoutine());
-    }
-}
+        // 木箱が壊れたとき
+        if (currentHp <= 0)
+        {
+            if (attacker != null)
+            {
+                // 壊したプレイヤーにランダムでアイテムを付与
+                attacker.GetRandomItem();
+            }
 
-    // 木箱の状態を初期化する（復活時にも呼ばれる）
+            StartCoroutine(DestroyAndRespawnRoutine());
+        }
+    }
+
+    // 木箱の状態を初期化
     private void ResetBox()
     {
         currentHp = maxHp;
-        spriteRenderer.enabled = true;
-        if (boxCollider != null) boxCollider.enabled = true;
 
-        // 【★追加】復活したときは綺麗な通常画像に戻す
-        if (normalSprite != null)
+        if (spriteRenderer != null)
         {
-            spriteRenderer.sprite = normalSprite;
+            spriteRenderer.enabled = true;
+
+            if (normalSprite != null)
+                spriteRenderer.sprite = normalSprite;
         }
+
+        if (boxCollider != null)
+            boxCollider.enabled = true;
     }
 }

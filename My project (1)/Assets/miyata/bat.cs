@@ -6,8 +6,8 @@ public class bat : MonoBehaviour
 {
     public bool player2 = false;
 
-    [Header("攻撃範囲の設定")]
-    public float attackRangeX = 3f;
+    [Header("攻撃範囲")]
+    public float attackRangeX = 2f;
     public float attackRangeY = 1.5f;
 
     [Header("溜め段階")]
@@ -37,15 +37,12 @@ public class bat : MonoBehaviour
     public SpriteRenderer spriteRenderer;
     public Sprite defaultSprite;
     public Sprite startChargeSprite;
-
     public Sprite normalAttackSprite;
     public Sprite normalChargeSprite;
     public Sprite normalRecoverySprite;
-
     public Sprite mediumChargeSprite;
     public Sprite mediumAttackSprite;
     public Sprite mediumRecoverySprite;
-
     public Sprite maxChargeSprite;
     public Sprite chargedAttackSprite;
     public Sprite chargedRecoverySprite;
@@ -81,36 +78,32 @@ public class bat : MonoBehaviour
         audioSource = GetComponent<AudioSource>();
 
         if (spriteRenderer == null)
-        {
             spriteRenderer = GetComponent<SpriteRenderer>();
-        }
 
         batSpriteRenderer = GetComponent<SpriteRenderer>();
 
         if (batSpriteRenderer != null)
-        {
             woodenBatSprite = batSpriteRenderer.sprite;
-        }
     }
 
     private void Update()
     {
+        Controller myController = GetComponent<Controller>();
+
         if (isAttackCooldown || isAttacking)
             return;
 
-        KeyCode attackKey;
-        KeyCode gamepadAttackKey;
+        if (myController != null &&
+            (myController.isItemStunned || myController.isDead))
+            return;
 
-        if (player2)
-        {
-            attackKey = KeyCode.DownArrow;
-            gamepadAttackKey = KeyCode.Joystick2Button5;
-        }
-        else
-        {
-            attackKey = KeyCode.S;
-            gamepadAttackKey = KeyCode.JoystickButton5;
-        }
+        KeyCode attackKey = player2
+            ? KeyCode.DownArrow
+            : KeyCode.S;
+
+        KeyCode gamepadAttackKey = player2
+            ? KeyCode.Joystick2Button5
+            : KeyCode.JoystickButton5;
 
         bool keyDown =
             Input.GetKeyDown(attackKey) ||
@@ -130,9 +123,7 @@ public class bat : MonoBehaviour
             currentChargeTime = 0f;
 
             if (spriteRenderer != null && startChargeSprite != null)
-            {
                 spriteRenderer.sprite = startChargeSprite;
-            }
         }
 
         if (isCharging && keyHeld)
@@ -149,9 +140,7 @@ public class bat : MonoBehaviour
         }
 
         if (isCharging && keyUp)
-        {
             ReleaseAttack();
-        }
     }
 
     private void UpdateChargeVisual()
@@ -178,34 +167,28 @@ public class bat : MonoBehaviour
         }
     }
 
-    // 攻撃方向
     private float GetFacingDirection()
     {
         if (enemy != null)
-        {
             return enemy.position.x >= transform.position.x ? 1f : -1f;
-        }
 
         if (zombieEnemy != null)
-        {
             return zombieEnemy.position.x >= transform.position.x ? 1f : -1f;
-        }
 
         return player2 ? -1f : 1f;
     }
 
-    // 木箱が攻撃範囲にあるか確認
     private bool IsWoodBoxInRange()
     {
-        float facingDirection = GetFacingDirection();
+        float direction = GetFacingDirection();
 
-        Vector2 boxCenter = new Vector2(
-            transform.position.x + facingDirection * attackRangeX / 2f,
+        Vector2 center = new Vector2(
+            transform.position.x + direction * attackRangeX / 2f,
             transform.position.y
         );
 
         Collider2D[] hits = Physics2D.OverlapBoxAll(
-            boxCenter,
+            center,
             new Vector2(attackRangeX, attackRangeY * 2f),
             0f,
             LayerMask.GetMask("WoodBox")
@@ -220,14 +203,11 @@ public class bat : MonoBehaviour
         return false;
     }
 
-    // 攻撃対象が範囲内にいるか確認
     private bool IsTargetInRange()
     {
-        // 木箱
         if (IsWoodBoxInRange())
             return true;
 
-        // ゾンビ
         if (zombieEnemy != null)
         {
             float dx = Mathf.Abs(
@@ -242,7 +222,6 @@ public class bat : MonoBehaviour
                 return true;
         }
 
-        // 相手プレイヤー
         if (enemy != null)
         {
             float dx = Mathf.Abs(
@@ -267,62 +246,70 @@ public class bat : MonoBehaviour
         float releasedChargeTime = currentChargeTime;
         currentChargeTime = 0f;
 
-        // 木箱・ゾンビ・プレイヤーのいずれかが範囲内なら攻撃
         if (!IsTargetInRange())
         {
             if (airAttacksound != null && audioSource != null)
-            {
                 audioSource.PlayOneShot(airAttacksound);
-            }
 
             StartCoroutine(AttackCooldown(normalAttackCooldown));
             StartCoroutine(
-                AttackAnimationRoutine(normalAttackSprite, normalRecoverySprite)
+                AttackAnimationRoutine(
+                    normalAttackSprite,
+                    normalRecoverySprite
+                )
             );
             return;
         }
 
         float cooldownDuration;
-        Sprite targetAttackSprite;
-        Sprite targetRecoverySprite;
+        float powerX;
+        float powerY;
+        float hitStun;
+        Sprite attackSprite;
+        Sprite recoverySprite;
+        AudioClip attackSound;
+        float soundVolume = 1f;
 
         if (releasedChargeTime >= maxChargeTime)
         {
             cooldownDuration = chargedAttackCooldown;
-            targetAttackSprite = chargedAttackSprite;
-            targetRecoverySprite = chargedRecoverySprite;
-
-            ExecuteAttack(chargedPowerX, chargedPowerY, chargedHitStun);
-
-            if (maxAttacksound != null && audioSource != null)
-                audioSource.PlayOneShot(maxAttacksound, 5f);
+            powerX = chargedPowerX;
+            powerY = chargedPowerY;
+            hitStun = chargedHitStun;
+            attackSprite = chargedAttackSprite;
+            recoverySprite = chargedRecoverySprite;
+            attackSound = maxAttacksound;
+            soundVolume = 5f;
         }
         else if (releasedChargeTime >= mediumChargeThreshold)
         {
             cooldownDuration = mediumAttackCooldown;
-            targetAttackSprite = mediumAttackSprite;
-            targetRecoverySprite = mediumRecoverySprite;
-
-            ExecuteAttack(mediumPowerX, mediumPowerY, mediumHitStun);
-
-            if (mediumAttacksound != null && audioSource != null)
-                audioSource.PlayOneShot(mediumAttacksound);
+            powerX = mediumPowerX;
+            powerY = mediumPowerY;
+            hitStun = mediumHitStun;
+            attackSprite = mediumAttackSprite;
+            recoverySprite = mediumRecoverySprite;
+            attackSound = mediumAttacksound;
         }
         else
         {
             cooldownDuration = normalAttackCooldown;
-            targetAttackSprite = normalAttackSprite;
-            targetRecoverySprite = normalRecoverySprite;
-
-            ExecuteAttack(normalPowerX, normalPowerY, normalHitStun);
-
-            if (weakAttacksound != null && audioSource != null)
-                audioSource.PlayOneShot(weakAttacksound);
+            powerX = normalPowerX;
+            powerY = normalPowerY;
+            hitStun = normalHitStun;
+            attackSprite = normalAttackSprite;
+            recoverySprite = normalRecoverySprite;
+            attackSound = weakAttacksound;
         }
+
+        bool hit = ExecuteAttack(powerX, powerY, hitStun);
+
+        if (hit && attackSound != null && audioSource != null)
+            audioSource.PlayOneShot(attackSound, soundVolume);
 
         StartCoroutine(AttackCooldown(cooldownDuration));
         StartCoroutine(
-            AttackAnimationRoutine(targetAttackSprite, targetRecoverySprite)
+            AttackAnimationRoutine(attackSprite, recoverySprite)
         );
     }
 
@@ -346,7 +333,7 @@ public class bat : MonoBehaviour
         isAttacking = false;
     }
 
-    private void ExecuteAttack(
+    private bool ExecuteAttack(
         float power,
         float upPower,
         float hitStunDuration)
@@ -360,7 +347,7 @@ public class bat : MonoBehaviour
             finalPowerY *= metalPowerMultiplier;
         }
 
-        // ① 木箱を攻撃
+        // ① 木箱への攻撃
         float facingDirection = GetFacingDirection();
 
         Vector2 boxCenter = new Vector2(
@@ -381,23 +368,23 @@ public class bat : MonoBehaviour
 
             if (box != null)
             {
-                // このプレイヤーを木箱に渡す
                 box.TakeDamage(1, this);
-                return;
+                return true;
             }
         }
 
-        // ② ゾンビを攻撃
+        // ② ゾンビへの攻撃
         if (zombieEnemy != null)
         {
-            float zombieDistanceX =
-                Mathf.Abs(zombieEnemy.position.x - transform.position.x);
+            float dx = Mathf.Abs(
+                zombieEnemy.position.x - transform.position.x
+            );
 
-            float zombieDistanceY =
-                Mathf.Abs(zombieEnemy.position.y - transform.position.y);
+            float dy = Mathf.Abs(
+                zombieEnemy.position.y - transform.position.y
+            );
 
-            if (zombieDistanceX <= attackRangeX &&
-                zombieDistanceY <= attackRangeY)
+            if (dx <= attackRangeX && dy <= attackRangeY)
             {
                 ZombieKnockback zombie =
                     zombieEnemy.GetComponent<ZombieKnockback>();
@@ -415,24 +402,51 @@ public class bat : MonoBehaviour
                     );
 
                     OnSuccessfulHit();
-                    return;
+                    return true;
                 }
             }
         }
 
-        // ③ 相手プレイヤーを攻撃
+        // ③ 相手プレイヤーへの攻撃
         if (enemy != null)
         {
-            float directionX =
-                enemy.position.x > transform.position.x
-                ? 1f
-                : -1f;
+            float dx = Mathf.Abs(
+                enemy.position.x - transform.position.x
+            );
 
-            Controller enemyController =
-                enemy.GetComponent<Controller>();
+            float dy = Mathf.Abs(
+                enemy.position.y - transform.position.y
+            );
 
-            if (enemyController != null)
+            if (dx <= attackRangeX && dy <= attackRangeY)
             {
+                Controller enemyController =
+                    enemy.GetComponent<Controller>();
+
+                if (enemyController == null)
+                    return false;
+
+                // シールド判定：既存の処理を維持
+                AutoGuardItem guard = enemy.GetComponent<AutoGuardItem>();
+
+                if (guard != null && guard.TryBlock(GetComponent<Controller>()))
+                {
+                    // シールドに防がれた攻撃側を硬直させる
+                    Controller attackerController = GetComponent<Controller>();
+
+                    if (attackerController != null)
+                    {
+                        attackerController.ApplyItemStun(1.5f);
+                    }
+
+                    return false;
+                }
+
+                float directionX =
+                    enemy.position.x > transform.position.x
+                    ? 1f
+                    : -1f;
+
                 enemyController.ReceiveKnockback(
                     directionX * finalPowerX,
                     finalPowerY,
@@ -440,16 +454,17 @@ public class bat : MonoBehaviour
                 );
 
                 OnSuccessfulHit();
+                return true;
             }
         }
+
+        return false;
     }
 
     private void ResetVisual()
     {
         if (spriteRenderer != null && defaultSprite != null)
-        {
             spriteRenderer.sprite = defaultSprite;
-        }
     }
 
     private IEnumerator AttackCooldown(float duration)
@@ -468,17 +483,48 @@ public class bat : MonoBehaviour
 
         isAttackCooldown = false;
     }
+    // 木箱を壊したプレイヤーにランダムでアイテムを付与
+    public void GetRandomItem()
+    {
+        int itemNumber = Random.Range(0, 2);
 
-    // 木箱を壊したプレイヤーが呼び出す入手処理
+        switch (itemNumber)
+        {
+            case 0:
+                // 金属バット
+                EquipMetalBat();
+                Debug.Log("金属バットを入手！");
+                break;
+
+            case 1:
+                // オートガード
+                AutoGuardItem guard = GetComponent<AutoGuardItem>();
+
+                if (guard != null)
+                {
+                    guard.hasItem = true;
+
+                    if (guard.shieldObject != null)
+                        guard.shieldObject.SetActive(true);
+
+                    Debug.Log("オートガードを入手！");
+                }
+                else
+                {
+                    Debug.LogWarning("AutoGuardItemがプレイヤーに付いていません。");
+                }
+                break;
+        }
+    }
+    // 木箱を壊したプレイヤーが金属バットを入手
     public void EquipMetalBat()
     {
         hasMetalBat = true;
         metalBatDurability = 3;
 
-        Debug.Log("金属バットを入手！");
     }
 
-    // 金属バットが敵などに命中したときだけ耐久値を減らす
+    // 敵に攻撃が命中したときだけ耐久値を減らす
     public void OnSuccessfulHit()
     {
         if (!hasMetalBat)
@@ -498,10 +544,10 @@ public class bat : MonoBehaviour
         metalBatDurability = 3;
 
         if (batSpriteRenderer != null && woodenBatSprite != null)
-        {
             batSpriteRenderer.sprite = woodenBatSprite;
-        }
 
         Debug.Log("金属バットが壊れて木製バットに戻った！");
     }
+  
 }
+
