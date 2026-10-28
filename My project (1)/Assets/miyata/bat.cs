@@ -1,136 +1,101 @@
-﻿using System.Collections;
-
+﻿
+using System.Collections;
 using UnityEngine;
 
 public class bat : MonoBehaviour
-
 {
-
     public bool player2 = false;
 
-    [Header("攻撃範囲の設定（ボタンを離した/最大溜め時に判定）")]
-
+    [Header("攻撃範囲の設定")]
     public float attackRangeX = 3f;
-
     public float attackRangeY = 1.5f;
 
-    [Header("溜め段階と威力の調整")]
-
-    public float mediumChargeThreshold = 2f; // 中溜めに必要な時間（秒）
-
-    public float maxChargeTime = 4f;         // 強攻撃になる（解放される）時間（秒）
-
+    [Header("溜め段階")]
+    public float mediumChargeThreshold = 2f;
+    public float maxChargeTime = 4f;
     public float autoReleaseTime = 6f;
 
-    [Header("1. 通常攻撃の設定")]
-
+    [Header("通常攻撃")]
     public float normalPowerX = 10f;
-
     public float normalPowerY = 4f;
-
     public float normalHitStun = 0.4f;
+    public float normalAttackCooldown = 0.3f;
 
-    public float normalAttackCooldown = 0.3f; // ★追加：通常攻撃の硬直時間
-
-    [Header("2. 中溜め攻撃の設定")]
-
+    [Header("中溜め攻撃")]
     public float mediumPowerX = 15f;
-
     public float mediumPowerY = 6f;
-
     public float mediumHitStun = 0.8f;
+    public float mediumAttackCooldown = 0.6f;
 
-    public float mediumAttackCooldown = 0.6f; // ★追加：中溜め攻撃の硬直時間
-
-    [Header("3. 強溜め攻撃の設定")]
-
+    [Header("強溜め攻撃")]
     public float chargedPowerX = 25f;
-
     public float chargedPowerY = 9f;
-
     public float chargedHitStun = 1.5f;
+    public float chargedAttackCooldown = 1.2f;
 
-    public float chargedAttackCooldown = 1.2f; // ★追加：強溜め攻撃の硬直時間
-
-    [Header("★見た目（スプライト）の変更設定")]
-
+    [Header("見た目")]
     public SpriteRenderer spriteRenderer;
-
     public Sprite defaultSprite;
-
     public Sprite startChargeSprite;
 
-    [Header("― 通常攻撃の画像 ―")]
-
     public Sprite normalAttackSprite;
-
     public Sprite normalChargeSprite;
-
     public Sprite normalRecoverySprite;
 
-    [Header("― 中溜め攻撃の画像 ―")]
-
     public Sprite mediumChargeSprite;
-
     public Sprite mediumAttackSprite;
-
     public Sprite mediumRecoverySprite;
 
-    [Header("― 強溜め攻撃の画像 ―")]
-
     public Sprite maxChargeSprite;
-
     public Sprite chargedAttackSprite;
-
     public Sprite chargedRecoverySprite;
 
-    [Header("参照")]
-
+    [Header("攻撃対象")]
     public Transform enemy;
+    public Transform zombieEnemy;
 
+    [Header("攻撃状態")]
     public bool isAttackCooldown = false;
-
-    private float currentChargeTime = 0f;
-
-    private bool isCharging = false;
-
     public bool isAttacking = false;
 
+    private float currentChargeTime = 0f;
+    private bool isCharging = false;
     private AudioSource audioSource;
 
-    //攻撃サウンド
-
+    [Header("攻撃サウンド")]
     public AudioClip weakAttacksound;
-
     public AudioClip mediumAttacksound;
-
     public AudioClip maxAttacksound;
-
     public AudioClip airAttacksound;
 
+    [Header("金属バット")]
+    public bool hasMetalBat = false;
+    public int metalBatDurability = 3;
+    public float metalPowerMultiplier = 1.5f;
 
+    private Sprite woodenBatSprite;
+    private SpriteRenderer batSpriteRenderer;
 
-    void Start()
-
+    private void Start()
     {
-
         audioSource = GetComponent<AudioSource>();
 
         if (spriteRenderer == null)
-
         {
-
             spriteRenderer = GetComponent<SpriteRenderer>();
-
         }
 
+        batSpriteRenderer = GetComponent<SpriteRenderer>();
+
+        if (batSpriteRenderer != null)
+        {
+            woodenBatSprite = batSpriteRenderer.sprite;
+        }
     }
 
- 
-    void Update()
+    private void Update()
     {
-        // 攻撃中・硬直中・敵がいないときは入力を受け付けない
-        if (enemy == null || isAttackCooldown || isAttacking)
+        if (isAttackCooldown || isAttacking)
             return;
 
         KeyCode attackKey;
@@ -147,7 +112,6 @@ public class bat : MonoBehaviour
             gamepadAttackKey = KeyCode.JoystickButton5;
         }
 
-        // キーボードまたはゲームパッドの入力状態
         bool keyDown =
             Input.GetKeyDown(attackKey) ||
             Input.GetKeyDown(gamepadAttackKey);
@@ -160,7 +124,6 @@ public class bat : MonoBehaviour
             Input.GetKeyUp(attackKey) ||
             Input.GetKeyUp(gamepadAttackKey);
 
-        // 1. ボタンを押した瞬間：溜め開始
         if (keyDown && !isCharging)
         {
             isCharging = true;
@@ -172,14 +135,11 @@ public class bat : MonoBehaviour
             }
         }
 
-        // 2. ボタンを押している間：溜め時間を増やす
         if (isCharging && keyHeld)
         {
             currentChargeTime += Time.deltaTime;
-
             UpdateChargeVisual();
 
-            // 最大時間を超えたら自動で攻撃
             if (currentChargeTime >= autoReleaseTime)
             {
                 currentChargeTime = autoReleaseTime;
@@ -188,292 +148,360 @@ public class bat : MonoBehaviour
             }
         }
 
-        // 3. ボタンを離した瞬間：攻撃
         if (isCharging && keyUp)
         {
             ReleaseAttack();
         }
     }
 
-
-    void UpdateChargeVisual()
-
+    private void UpdateChargeVisual()
     {
-
-        if (spriteRenderer == null) return;
+        if (spriteRenderer == null)
+            return;
 
         if (currentChargeTime >= maxChargeTime)
-
         {
-
-            if (maxChargeSprite != null) spriteRenderer.sprite = maxChargeSprite;
-
+            if (maxChargeSprite != null)
+                spriteRenderer.sprite = maxChargeSprite;
         }
-
         else if (currentChargeTime >= mediumChargeThreshold)
-
         {
-
-            if (mediumChargeSprite != null) spriteRenderer.sprite = mediumChargeSprite;
-
+            if (mediumChargeSprite != null)
+                spriteRenderer.sprite = mediumChargeSprite;
         }
-
         else
-
         {
-
             if (startChargeSprite != null)
-
-            {
-
                 spriteRenderer.sprite = startChargeSprite;
-
-            }
-
             else if (defaultSprite != null)
-
-            {
-
                 spriteRenderer.sprite = defaultSprite;
-
-            }
-
         }
-
     }
 
-    // 攻撃の発動・判定を行う共通処理
-
-    // 攻撃の発動・判定を行う共通処理
-
-    void ReleaseAttack()
-
+    // 攻撃方向
+    private float GetFacingDirection()
     {
-
-        isCharging = false;
-
-        float distanceX = Mathf.Abs(enemy.position.x - transform.position.x);
-
-        float distanceY = Mathf.Abs(enemy.position.y - transform.position.y);
-
-        bool inRange = (distanceX <= attackRangeX && distanceY <= attackRangeY);
-
-        float releasedChargeTime = currentChargeTime;
-
-        currentChargeTime = 0f;
-
-        // ★1. 範囲外（空振り）の場合の処理を一番上に持ってくる
-
-        if (!inRange)
-
+        if (enemy != null)
         {
-
-            if (airAttacksound != null && audioSource != null)
-
-            {
-
-                audioSource.PlayOneShot(airAttacksound);
-
-            }
-
-            // 空振りのときの硬直時間やモーションを設定したい場合はここで指定できます
-
-            // 例として通常攻撃と同じ硬直・モーションにする場合：
-
-            StartCoroutine(AttackCooldown(normalAttackCooldown));
-
-            StartCoroutine(AttackAnimationRoutine(normalAttackSprite, normalRecoverySprite));
-
-            return; // 処理をここで終了する
-
+            return enemy.position.x >= transform.position.x ? 1f : -1f;
         }
 
-        // ★2. 以降は敵が範囲内にいる場合の溜め段階ごとの処理
+        if (zombieEnemy != null)
+        {
+            return zombieEnemy.position.x >= transform.position.x ? 1f : -1f;
+        }
 
-        float cooldownDuration = 0f;
+        return player2 ? -1f : 1f;
+    }
 
-        Sprite targetAttackSprite = null;
+    // 木箱が攻撃範囲にあるか確認
+    private bool IsWoodBoxInRange()
+    {
+        float facingDirection = GetFacingDirection();
 
-        Sprite targetRecoverySprite = null;
+        Vector2 boxCenter = new Vector2(
+            transform.position.x + facingDirection * attackRangeX / 2f,
+            transform.position.y
+        );
+
+        Collider2D[] hits = Physics2D.OverlapBoxAll(
+            boxCenter,
+            new Vector2(attackRangeX, attackRangeY * 2f),
+            0f,
+            LayerMask.GetMask("WoodBox")
+        );
+
+        foreach (Collider2D hit in hits)
+        {
+            if (hit.GetComponent<WoodBox>() != null)
+                return true;
+        }
+
+        return false;
+    }
+
+    // 攻撃対象が範囲内にいるか確認
+    private bool IsTargetInRange()
+    {
+        // 木箱
+        if (IsWoodBoxInRange())
+            return true;
+
+        // ゾンビ
+        if (zombieEnemy != null)
+        {
+            float dx = Mathf.Abs(
+                zombieEnemy.position.x - transform.position.x
+            );
+
+            float dy = Mathf.Abs(
+                zombieEnemy.position.y - transform.position.y
+            );
+
+            if (dx <= attackRangeX && dy <= attackRangeY)
+                return true;
+        }
+
+        // 相手プレイヤー
+        if (enemy != null)
+        {
+            float dx = Mathf.Abs(
+                enemy.position.x - transform.position.x
+            );
+
+            float dy = Mathf.Abs(
+                enemy.position.y - transform.position.y
+            );
+
+            if (dx <= attackRangeX && dy <= attackRangeY)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void ReleaseAttack()
+    {
+        isCharging = false;
+
+        float releasedChargeTime = currentChargeTime;
+        currentChargeTime = 0f;
+
+        // 木箱・ゾンビ・プレイヤーのいずれかが範囲内なら攻撃
+        if (!IsTargetInRange())
+        {
+            if (airAttacksound != null && audioSource != null)
+            {
+                audioSource.PlayOneShot(airAttacksound);
+            }
+
+            StartCoroutine(AttackCooldown(normalAttackCooldown));
+            StartCoroutine(
+                AttackAnimationRoutine(normalAttackSprite, normalRecoverySprite)
+            );
+            return;
+        }
+
+        float cooldownDuration;
+        Sprite targetAttackSprite;
+        Sprite targetRecoverySprite;
 
         if (releasedChargeTime >= maxChargeTime)
-
         {
-
             cooldownDuration = chargedAttackCooldown;
-
             targetAttackSprite = chargedAttackSprite;
-
             targetRecoverySprite = chargedRecoverySprite;
 
             ExecuteAttack(chargedPowerX, chargedPowerY, chargedHitStun);
 
             if (maxAttacksound != null && audioSource != null)
-
-            {
-
-                audioSource.PlayOneShot(maxAttacksound, 5.0f);
-
-            }
-
+                audioSource.PlayOneShot(maxAttacksound, 5f);
         }
-
         else if (releasedChargeTime >= mediumChargeThreshold)
-
         {
-
             cooldownDuration = mediumAttackCooldown;
-
             targetAttackSprite = mediumAttackSprite;
-
             targetRecoverySprite = mediumRecoverySprite;
 
             ExecuteAttack(mediumPowerX, mediumPowerY, mediumHitStun);
 
             if (mediumAttacksound != null && audioSource != null)
-
-            {
-
                 audioSource.PlayOneShot(mediumAttacksound);
-
-            }
-
         }
-
         else
-
         {
             cooldownDuration = normalAttackCooldown;
-
             targetAttackSprite = normalAttackSprite;
-
             targetRecoverySprite = normalRecoverySprite;
 
             ExecuteAttack(normalPowerX, normalPowerY, normalHitStun);
 
             if (weakAttacksound != null && audioSource != null)
-
-            {
-
                 audioSource.PlayOneShot(weakAttacksound);
-
-            }
-
         }
 
-        // 範囲内にヒットしたときの硬直とアニメーションを実行
-
         StartCoroutine(AttackCooldown(cooldownDuration));
-
-        StartCoroutine(AttackAnimationRoutine(targetAttackSprite, targetRecoverySprite));
-
+        StartCoroutine(
+            AttackAnimationRoutine(targetAttackSprite, targetRecoverySprite)
+        );
     }
 
-    IEnumerator AttackAnimationRoutine(Sprite attackSprite, Sprite recoverySprite)
-
+    private IEnumerator AttackAnimationRoutine(
+        Sprite attackSprite,
+        Sprite recoverySprite)
     {
-
         isAttacking = true;
 
         if (spriteRenderer != null && attackSprite != null)
-
-        {
-
             spriteRenderer.sprite = attackSprite;
-
-        }
 
         yield return new WaitForSeconds(0.1f);
 
         if (spriteRenderer != null && recoverySprite != null)
-
-        {
-
             spriteRenderer.sprite = recoverySprite;
-
-        }
 
         yield return new WaitForSeconds(0.15f);
 
         ResetVisual();
-
         isAttacking = false;
-
     }
 
-    void ExecuteAttack(float power, float upPower, float hitStunDuration)
-
+    private void ExecuteAttack(
+        float power,
+        float upPower,
+        float hitStunDuration)
     {
+        float finalPowerX = power;
+        float finalPowerY = upPower;
 
-        float directionX = 0f;
-
-        if (enemy.position.x > transform.position.x)
-
+        if (hasMetalBat)
         {
-
-            directionX = power;
-
+            finalPowerX *= metalPowerMultiplier;
+            finalPowerY *= metalPowerMultiplier;
         }
 
-        else
+        // ① 木箱を攻撃
+        float facingDirection = GetFacingDirection();
 
+        Vector2 boxCenter = new Vector2(
+            transform.position.x + facingDirection * attackRangeX / 2f,
+            transform.position.y
+        );
+
+        Collider2D[] hits = Physics2D.OverlapBoxAll(
+            boxCenter,
+            new Vector2(attackRangeX, attackRangeY * 2f),
+            0f,
+            LayerMask.GetMask("WoodBox")
+        );
+
+        foreach (Collider2D hit in hits)
         {
+            WoodBox box = hit.GetComponent<WoodBox>();
 
-            directionX = -power;
-
+            if (box != null)
+            {
+                // このプレイヤーを木箱に渡す
+                box.TakeDamage(1, this);
+                return;
+            }
         }
 
-        Controller enemyController = enemy.GetComponent<Controller>();
-
-        if (enemyController != null)
-
+        // ② ゾンビを攻撃
+        if (zombieEnemy != null)
         {
+            float zombieDistanceX =
+                Mathf.Abs(zombieEnemy.position.x - transform.position.x);
 
-            enemyController.ReceiveKnockback(directionX, upPower, hitStunDuration);
+            float zombieDistanceY =
+                Mathf.Abs(zombieEnemy.position.y - transform.position.y);
 
+            if (zombieDistanceX <= attackRangeX &&
+                zombieDistanceY <= attackRangeY)
+            {
+                ZombieKnockback zombie =
+                    zombieEnemy.GetComponent<ZombieKnockback>();
+
+                if (zombie != null)
+                {
+                    float directionX =
+                        zombieEnemy.position.x > transform.position.x
+                        ? 1f
+                        : -1f;
+
+                    zombie.GetKnockedBack(
+                        directionX * finalPowerX,
+                        finalPowerY
+                    );
+
+                    OnSuccessfulHit();
+                    return;
+                }
+            }
         }
 
-        // ★削除：ここでの一律0.5秒のコルーチン開始は削除し、ReleaseAttack側に統合しました
+        // ③ 相手プレイヤーを攻撃
+        if (enemy != null)
+        {
+            float directionX =
+                enemy.position.x > transform.position.x
+                ? 1f
+                : -1f;
 
+            Controller enemyController =
+                enemy.GetComponent<Controller>();
+
+            if (enemyController != null)
+            {
+                enemyController.ReceiveKnockback(
+                    directionX * finalPowerX,
+                    finalPowerY,
+                    hitStunDuration
+                );
+
+                OnSuccessfulHit();
+            }
+        }
     }
 
-    void ResetVisual()
-
+    private void ResetVisual()
     {
-
         if (spriteRenderer != null && defaultSprite != null)
-
         {
-
             spriteRenderer.sprite = defaultSprite;
-
         }
-
     }
 
-    // ★変更：引数で硬直時間を受け取れるように変更
-
-    IEnumerator AttackCooldown(float duration)
-
+    private IEnumerator AttackCooldown(float duration)
     {
         isAttackCooldown = true;
 
-        // 自分のControllerを取得
         Controller myController = GetComponent<Controller>();
 
         if (myController != null)
-        {
             myController.isAttackLocked = true;
-        }
 
         yield return new WaitForSeconds(duration);
 
         if (myController != null)
-        {
             myController.isAttackLocked = false;
-        }
 
         isAttackCooldown = false;
     }
 
+    // 木箱を壊したプレイヤーが呼び出す入手処理
+    public void EquipMetalBat()
+    {
+        hasMetalBat = true;
+        metalBatDurability = 3;
+
+        Debug.Log("金属バットを入手！");
+    }
+
+    // 金属バットが敵などに命中したときだけ耐久値を減らす
+    public void OnSuccessfulHit()
+    {
+        if (!hasMetalBat)
+            return;
+
+        metalBatDurability--;
+
+        Debug.Log("金属バット残り耐久：" + metalBatDurability);
+
+        if (metalBatDurability <= 0)
+            BreakMetalBat();
+    }
+
+    private void BreakMetalBat()
+    {
+        hasMetalBat = false;
+        metalBatDurability = 3;
+
+        if (batSpriteRenderer != null && woodenBatSprite != null)
+        {
+            batSpriteRenderer.sprite = woodenBatSprite;
+        }
+
+        Debug.Log("金属バットが壊れて木製バットに戻った！");
+    }
 }

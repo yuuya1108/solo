@@ -1,16 +1,20 @@
+
 using UnityEngine;
 
-public class My_aitem : MonoBehaviour
+public class MetalBatItem : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    private void OnTriggerEnter2D(Collider2D collision)
     {
-        
-    }
+        if (!collision.CompareTag("Player"))
+            return;
 
-    // Update is called once per frame
-    void Update()
-    {
-        
+        bat playerBat = collision.GetComponent<bat>();
+
+        if (playerBat == null)
+            return;
+
+        playerBat.EquipMetalBat();
+
+        Destroy(gameObject);
     }
 }

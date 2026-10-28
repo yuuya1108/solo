@@ -90,6 +90,7 @@ public class Controller : MonoBehaviour
 
     private bool hasLeftGround = false;
 
+
     void Start()
 
     {
