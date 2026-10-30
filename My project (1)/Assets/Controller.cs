@@ -132,8 +132,13 @@ public class Controller : MonoBehaviour
     {
         if (isItemStunned)
         {
-            // シールドに攻撃を防がれたら、その場で完全に停止
-            rb.linearVelocity = Vector2.zero;
+            // シールド硬直中でも、ノックバック中なら速度をゼロにしない
+            if (!GetComponent<PlayerKnockback>().IsKnockbacked
+                && !isKnockback)
+            {
+                rb.linearVelocity = Vector2.zero;
+            }
+
             return;
         }
         // =========================
@@ -780,69 +785,56 @@ public class Controller : MonoBehaviour
 
     //ジャンプ地面にいるか検知     
 
+
     void OnCollisionEnter2D(Collision2D collision)
-
     {
+        bool isGroundOrBox =
+            collision.gameObject.CompareTag("Ground") ||
+            collision.gameObject.CompareTag("kibako");
 
-        if (collision.gameObject.CompareTag("Ground"))
-
+        // 地面・木箱の上面に触れた場合だけ着地扱い
+        if (isGroundOrBox)
         {
-
             foreach (ContactPoint2D contact in collision.contacts)
-
             {
-
                 if (contact.normal.y > 0.5f)
-
                 {
-
                     isGrounded = true;
-
                     isJumping = false;
-
                     jumpBlocked = false;
-
                     jumpHorizontalspeed = 0f;
-
+                    break;
                 }
-
             }
-
         }
 
+        // 木箱との接触では壁判定を行わない
+        if (collision.gameObject.CompareTag("kibako"))
+            return;
+
+        // 木箱以外の側面にぶつかった場合だけ横移動を止める
         foreach (ContactPoint2D contact in collision.contacts)
-
         {
-
-            //側面にぶつかった場合
-
             if (Mathf.Abs(contact.normal.x) > 0.5f)
-
             {
-
                 jumpHorizontalspeed = 0f;
 
                 rb.linearVelocity = new Vector2(
-
                     0f,
-
                     rb.linearVelocity.y
-
-                    );
+                );
 
                 break;
-
             }
-
         }
-
     }
+
 
     void OnCollisionExit2D(Collision2D collision)
 
     {
 
-        if (collision.gameObject.CompareTag("Ground"))
+        if (collision.gameObject.CompareTag("Ground") || collision.gameObject.CompareTag("kibako"))
 
         {
 
@@ -1099,7 +1091,17 @@ public class Controller : MonoBehaviour
         }
 
     }
+    // スピードアップ
+    public IEnumerator SpeedUp()
+    {
+        float originalSpeed = speed;
 
+        speed *= 1.5f;
+
+        yield return new WaitForSeconds(10f);
+
+        speed = originalSpeed;
+    }
     //// =========================
 
     //// 吹き飛ばし

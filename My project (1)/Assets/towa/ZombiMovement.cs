@@ -16,9 +16,10 @@ public class ZombieMovement : MonoBehaviour
     private int direction = 1;
     // 1 = 右, -1 = 左
     private int moveDirection = 1;
-    
+    private ZombieKnockback knockback;
     void Start() 
-    { 
+    {
+        knockback = GetComponent<ZombieKnockback>();
         rb = GetComponent<Rigidbody2D>(); 
         timer = changeDirectionTime;
         // 1. 本来の地面のY座標を覚えておく
@@ -40,21 +41,30 @@ public class ZombieMovement : MonoBehaviour
             RiseFromGround();
             return;
         }
-
+        if (knockback != null && knockback.IsKnockedBack())
+            return;
         // 一定時間ごとに自動で向きを変える
         timer -= Time.deltaTime; 
         if (timer <= 0) 
         { 
             ChangeDirection(); 
         } 
-    } 
-    void FixedUpdate() 
-    {
+    }
 
+    void FixedUpdate()
+    {
         if (isRising) return;
-        // 物理演算で横移動
-        rb.linearVelocity = new Vector2(direction * moveSpeed, rb.linearVelocity.y);
-    } 
+
+        // 吹っ飛び中は通常移動を停止
+        if (knockback != null && knockback.IsKnockedBack())
+            return;
+
+        rb.linearVelocity = new Vector2(
+            direction * moveSpeed,
+            rb.linearVelocity.y
+        );
+    }
+
     // 地面からせり上がる処理
     void RiseFromGround()
     { 
@@ -70,10 +80,13 @@ public class ZombieMovement : MonoBehaviour
             // 物理演算を元に戻して歩き出せるようにする
         } 
     }
-    
+
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // "Enemy" などのタグがついた壁に当たったら反転
+        // ノックバック中は向きを変えない
+        if (knockback != null && knockback.IsKnockedBack())
+            return;
+
         if (collision.gameObject.CompareTag("Enemy"))
         {
             ChangeDirection();

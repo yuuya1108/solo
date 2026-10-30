@@ -70,6 +70,9 @@ public class bat : MonoBehaviour
     public int metalBatDurability = 3;
     public float metalPowerMultiplier = 1.5f;
 
+    [Header("金属バットの見た目")]
+    public GameObject metalBatObject;
+
     private Sprite woodenBatSprite;
     private SpriteRenderer batSpriteRenderer;
 
@@ -84,6 +87,9 @@ public class bat : MonoBehaviour
 
         if (batSpriteRenderer != null)
             woodenBatSprite = batSpriteRenderer.sprite;
+        // 最初は金属バットを非表示にする
+        if (metalBatObject != null)
+            metalBatObject.SetActive(false);
     }
 
     private void Update()
@@ -208,20 +214,33 @@ public class bat : MonoBehaviour
         if (IsWoodBoxInRange())
             return true;
 
-        if (zombieEnemy != null)
+        // 攻撃範囲内のゾンビを探す
+        float direction = GetFacingDirection();
+
+        Vector2 attackCenter = new Vector2(
+            transform.position.x + direction * attackRangeX / 2f,
+            transform.position.y
+        );
+
+        Collider2D[] zombieHits = Physics2D.OverlapBoxAll(
+            attackCenter,
+            new Vector2(attackRangeX, attackRangeY * 2f),
+            0f
+        );
+
+        foreach (Collider2D hit in zombieHits)
         {
-            float dx = Mathf.Abs(
-                zombieEnemy.position.x - transform.position.x
-            );
+            ZombieKnockback zombie =
+                hit.GetComponent<ZombieKnockback>();
 
-            float dy = Mathf.Abs(
-                zombieEnemy.position.y - transform.position.y
-            );
+            if (zombie == null)
+                zombie = hit.GetComponentInParent<ZombieKnockback>();
 
-            if (dx <= attackRangeX && dy <= attackRangeY)
+            if (zombie != null)
                 return true;
         }
 
+        // 相手プレイヤーの判定
         if (enemy != null)
         {
             float dx = Mathf.Abs(
@@ -373,38 +392,41 @@ public class bat : MonoBehaviour
             }
         }
 
-        // ② ゾンビへの攻撃
-        if (zombieEnemy != null)
+        // ② 攻撃範囲内のゾンビを探す
+        float direction = GetFacingDirection();
+
+        Vector2 attackCenter = new Vector2(
+            transform.position.x + direction * attackRangeX / 2f,
+            transform.position.y
+        );
+
+        Collider2D[] zombieHits = Physics2D.OverlapBoxAll(
+            attackCenter,
+            new Vector2(attackRangeX, attackRangeY * 2f),
+            0f
+        );
+
+        foreach (Collider2D hit in zombieHits)
         {
-            float dx = Mathf.Abs(
-                zombieEnemy.position.x - transform.position.x
+            ZombieKnockback zombie =
+                hit.GetComponent<ZombieKnockback>();
+
+            if (zombie == null)
+                zombie = hit.GetComponentInParent<ZombieKnockback>();
+
+            if (zombie == null)
+                continue;
+
+            float directionX =
+                zombie.transform.position.x >= transform.position.x ? 1f : -1f;
+
+            zombie.GetKnockedBack(
+                directionX * finalPowerX,
+                finalPowerY
             );
 
-            float dy = Mathf.Abs(
-                zombieEnemy.position.y - transform.position.y
-            );
-
-            if (dx <= attackRangeX && dy <= attackRangeY)
-            {
-                ZombieKnockback zombie =
-                    zombieEnemy.GetComponent<ZombieKnockback>();
-
-                if (zombie != null)
-                {
-                    float directionX =
-                        zombieEnemy.position.x > transform.position.x
-                        ? 1f
-                        : -1f;
-
-                    zombie.GetKnockedBack(
-                        directionX * finalPowerX,
-                        finalPowerY
-                    );
-
-                    OnSuccessfulHit();
-                    return true;
-                }
-            }
+            OnSuccessfulHit();
+            return true;
         }
 
         // ③ 相手プレイヤーへの攻撃
@@ -484,9 +506,12 @@ public class bat : MonoBehaviour
         isAttackCooldown = false;
     }
     // 木箱を壊したプレイヤーにランダムでアイテムを付与
+
+    // 木箱を壊したプレイヤーにランダムでアイテムを付与
     public void GetRandomItem()
     {
-        int itemNumber = Random.Range(0, 2);
+        // 0～2の3種類からランダム選択
+        int itemNumber = Random.Range(0, 3);
 
         switch (itemNumber)
         {
@@ -514,14 +539,30 @@ public class bat : MonoBehaviour
                     Debug.LogWarning("AutoGuardItemがプレイヤーに付いていません。");
                 }
                 break;
+
+            case 2:
+                // スピードアップ
+                Controller controller = GetComponent<Controller>();
+
+                if (controller != null)
+                {
+                    controller.StartCoroutine(controller.SpeedUp());
+                    Debug.Log("10秒間スピードが1.3倍になりました！");
+                }
+                break;
         }
     }
+
     // 木箱を壊したプレイヤーが金属バットを入手
     public void EquipMetalBat()
     {
         hasMetalBat = true;
         metalBatDurability = 3;
 
+        if (metalBatObject != null)
+            metalBatObject.SetActive(true);
+
+        Debug.Log("金属バットを入手！見た目を表示しました。");
     }
 
     // 敵に攻撃が命中したときだけ耐久値を減らす
@@ -543,11 +584,14 @@ public class bat : MonoBehaviour
         hasMetalBat = false;
         metalBatDurability = 3;
 
+        if (metalBatObject != null)
+            metalBatObject.SetActive(false);
+
         if (batSpriteRenderer != null && woodenBatSprite != null)
             batSpriteRenderer.sprite = woodenBatSprite;
 
         Debug.Log("金属バットが壊れて木製バットに戻った！");
     }
-  
+
 }
 
